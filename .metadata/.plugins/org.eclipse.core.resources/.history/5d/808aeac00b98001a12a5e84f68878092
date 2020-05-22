@@ -1,0 +1,11 @@
+#include <vector>
+#include <map>
+#include <regex>
+#include <string>
+
+struct InvokePlaceholder;
+void compile_token(std::vector<byte> &compiled, std::map<std::string, counter> &functions, std::map<std::string, stack_location> &variables, unsigned int &stack_location, std::vector<InvokePlaceholder> &invokes, std::string &token);
+void compile_lambda(std::vector<byte> &compiled, std::map<std::string, counter> &functions, std::vector<InvokePlaceholder> &invokes, std::string &l_source);
+void compile_string(std::vector<byte> &compiled, std::string &s);
+void compile_function(std::vector<byte> &compiled, std::map<std::string, counter> functions, std::vector<InvokePlaceholder> &invokes, FunctionSource &f_source);
+void compile_source(std::vector<byte> &compiled, std::map<std::string, counter> &functions, std::vector<InvokePlaceholder> &invokes, std::string &source);

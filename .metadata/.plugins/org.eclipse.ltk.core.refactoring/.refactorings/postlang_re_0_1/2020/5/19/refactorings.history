@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Move &apos;test.post&apos; to &apos;postlang_re_0_1&apos;" description="Move &apos;test.post&apos; to &apos;postlang_re_0_1&apos;" destination="/postlang_re_0_1" element1="/postlang_c_0_1/test.post" flags="7" id="org.eclipse.ltk.core.refactoring.move.resources" resources="1" stamp="1589001671301" updateReferences="true"/>
+</session>

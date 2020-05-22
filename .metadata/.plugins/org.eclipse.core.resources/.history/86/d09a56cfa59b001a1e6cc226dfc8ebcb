@@ -1,0 +1,8 @@
+let x = stdio.cin_i;
+x stdio.cout_i
+x if {
+	x stdio.cout_i
+}
+{
+	x 1 add_i stdio.cout_i
+}

@@ -1,0 +1,12 @@
+define factorial (long x) (long)
+{
+	x 1l le_l if
+	{
+		return 1l;
+	}
+	{
+		return x x 1l sub_l factorial mult_l;
+	}
+}
+
+stdio.cin_l factorial stdio.cout_l

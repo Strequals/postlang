@@ -1,0 +1,4 @@
+0 0 eq if
+{"Y"}
+{"N"}
+stdio.cout

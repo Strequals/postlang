@@ -1,0 +1,3 @@
+let x = 1;
+"H" stdio.cout
+x stdio.cout

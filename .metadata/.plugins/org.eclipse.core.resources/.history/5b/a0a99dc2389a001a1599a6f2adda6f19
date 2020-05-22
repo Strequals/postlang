@@ -1,0 +1,2 @@
+let x = 1;
+"Hello World!" 12 _stdio.cout_ map

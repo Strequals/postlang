@@ -1,0 +1,332 @@
+//============================================================================
+// Name        : postlang_re_0_1.cpp
+// Author      : 
+// Version     :
+// Copyright   : Your copyright notice
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+#include <iostream>
+#include <fstream>
+#include <iterator>
+#include <vector>
+#include <postlang_stdio.h>
+
+typedef unsigned char byte;
+typedef unsigned int counter;
+
+unsigned int intFromBytes(byte b1, byte b2, byte b3, byte b4) {
+	return (int) (b1 << 24 | b2 << 16 | b3 << 8 | b4);
+}
+
+void debug(std::vector<byte> &expression_stack) {
+	for (unsigned int i = 0; i < expression_stack.size(); i++) {
+		std::cout << (int) expression_stack[i] << " ";
+	}
+	std::cout << std::endl;
+}
+
+unsigned int n,x;
+void execute(counter &program_counter, std::vector<byte> program_data, std::vector<byte> &expression_stack, std::vector<counter> &return_stack, std::vector<byte> &temp_stack) {
+	//int n,x;
+	switch (program_data[program_counter]) {
+	case 0:
+		//push
+		program_counter++;
+		expression_stack.push_back(program_data[program_counter]);
+		break;
+	case 1:
+		//push_n
+		program_counter++;
+		n = program_data[program_counter];
+		/*for (int x = 0; x < n; x++) {
+					program_counter++;
+					expression_stack.push_back(program_data[program_counter]);
+				}*/
+		program_counter++;
+		expression_stack.insert(std::end(expression_stack), program_data.begin()+program_counter, program_data.begin()+program_counter+n);
+		program_counter += n - 1;
+		break;
+	case 2:
+		//pop
+		expression_stack.pop_back();
+		break;
+	case 3:
+		//pop_n
+		program_counter++;
+		n = program_data[program_counter];
+		/*for (int x = 0; x < n; x++) {
+					expression_stack.pop_back();
+
+				}*/
+		expression_stack.resize(expression_stack.size() - n);
+		break;
+	case 4:
+		//dup
+		expression_stack.push_back(expression_stack[expression_stack.size()-1]);
+		break;
+	case 5:
+		//dup_n
+		program_counter++;
+		n = program_data[program_counter];
+		expression_stack.insert(std::end(expression_stack), std::end(expression_stack)-n, std::end(expression_stack));
+		break;
+	case 6:
+		//dup_x
+		program_counter++;
+		x = intFromBytes(
+				program_data[program_counter],
+				program_data[program_counter+1],
+				program_data[program_counter+2],
+				program_data[program_counter+3]);
+		program_counter += 3;
+		expression_stack.push_back(expression_stack[expression_stack.size() - x - 1]);
+		break;
+	case 7:
+		//dup_x_n
+		program_counter++;
+		x = intFromBytes(
+				program_data[program_counter],
+				program_data[program_counter+1],
+				program_data[program_counter+2],
+				program_data[program_counter+3]);
+		program_counter += 4;
+		n = program_data[program_counter];
+		expression_stack.insert(std::end(expression_stack), std::end(expression_stack)-x-1, std::end(expression_stack)-x+n-1);
+		break;
+	case 8:
+		//branch
+		program_counter++;
+		program_counter = intFromBytes(
+				program_data[program_counter],
+				program_data[program_counter+1],
+				program_data[program_counter+2],
+				program_data[program_counter+3]);
+		program_counter--;
+		break;
+	case 9:
+		//branchif
+		if (expression_stack.back() > 0) {
+			program_counter++;
+			program_counter = intFromBytes(
+					program_data[program_counter],
+					program_data[program_counter+1],
+					program_data[program_counter+2],
+					program_data[program_counter+3]);
+			program_counter--;
+		} else {
+			program_counter += 4;
+		}
+		expression_stack.pop_back();
+		break;
+	case 10:
+		//invoke
+		program_counter++;
+		return_stack.push_back(program_counter+4);
+		program_counter = intFromBytes(
+				program_data[program_counter],
+				program_data[program_counter+1],
+				program_data[program_counter+2],
+				program_data[program_counter+3]);
+		program_counter--;
+		break;
+	case 11:
+		//return
+		program_counter++;
+		n=program_data[program_counter];
+		program_counter++;
+		x=program_data[program_counter];
+		expression_stack.erase(std::end(expression_stack)-n-x,std::end(expression_stack)-n);
+		program_counter = return_stack.back();
+		program_counter--;
+		return_stack.pop_back();
+		break;
+	case 12:
+		//map
+	{
+		counter map_location = program_counter;
+		byte map_l1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_l2 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_l3 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_l4 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_b1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_b2 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_b3 = expression_stack.back();
+		expression_stack.pop_back();
+		byte map_b4 = expression_stack.back();
+		expression_stack.pop_back();
+
+		unsigned int map_function_location = intFromBytes(map_l4, map_l3, map_l2, map_l1);
+
+		unsigned int map_times = intFromBytes(map_b4, map_b3, map_b2, map_b1);
+
+		byte i;
+		byte map_temp;
+		for (i = 0; i < map_times; i++) {
+			map_temp = expression_stack.back();
+			temp_stack.push_back(map_temp);
+			expression_stack.pop_back();
+		}
+		for (i = 0; i < map_times; i++) {
+			map_temp = temp_stack.back();
+			expression_stack.push_back(map_temp);
+			temp_stack.pop_back();
+			//TODO: implement execution
+			program_counter = map_function_location;
+			return_stack.push_back(map_location);
+			while (program_counter != map_location) {
+				execute(program_counter, program_data, expression_stack, return_stack, temp_stack);
+				program_counter++;
+			}
+		}
+	}
+	break;
+	case 13:
+		//map_n
+		break;
+	case 14:
+		//and
+	{
+		byte andop1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte andop2 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(andop1 & andop2);
+	}
+	break;
+	case 15:
+		//nand
+	{
+		byte nandop1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte nandop2 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(~(nandop1 & nandop2));
+	}
+	break;
+	case 16:
+		//or
+	{
+		byte orop1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte orop2 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(orop1 | orop2);
+	}
+	break;
+	case 17:
+		//nor
+	{
+		byte norop1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte norop2 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(~(norop1 | norop2));
+	}
+	break;
+	case 18:
+		//not
+	{
+		byte notop1 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(~notop1);
+	}
+	break;
+	case 19:
+		//xor
+	{
+		byte xorop1 = expression_stack.back();
+		expression_stack.pop_back();
+		byte xorop2 = expression_stack.back();
+		expression_stack.pop_back();
+		expression_stack.push_back(xorop1 ^ xorop2);
+	}
+	break;
+	case 254:
+		//debug
+		for (unsigned int i = 0; i < expression_stack.size(); i++) {
+			std::cout << (int) expression_stack[i] << " ";
+		}
+		std::cout << std::endl;
+		break;
+	case 255:
+		//invoke_internal
+
+	{
+		program_counter++;
+		switch (program_data[program_counter]) {
+		case 0:
+			//stdio
+		{
+			program_counter++;
+			switch (program_data[program_counter]) {
+			case 0:
+				//cin
+				expression_stack.push_back(postlang_stdio::cin());
+				break;
+			case 1:
+				//cout
+				postlang_stdio::cout(expression_stack.back());
+				expression_stack.pop_back();
+				break;
+			case 2:
+				//cerr
+				postlang_stdio::cerr(expression_stack.back());
+				expression_stack.pop_back();
+				break;
+			case 3:
+				//cin_i
+				postlang_stdio::cin_i();
+			}
+		}
+		break;
+
+		}
+	}
+	break;
+	}
+}
+
+int main(int argc, char *argv[]) {
+	//std::cout << argv[0] << std::endl << argv[1];
+	if (argc != 2) return 0;
+	std::string program_file(argv[1]);
+	std::ifstream program_input(program_file, std::ios::binary);
+	program_input.unsetf(std::ios::skipws);
+	std::vector<byte> program_data;
+
+	std::streampos file_size;
+	program_input.seekg(0, std::ios::end);
+	file_size = program_input.tellg();
+	program_input.seekg(0, std::ios::beg);
+
+	program_data.reserve(file_size);
+	program_data.insert(program_data.begin(),(std::istream_iterator<byte>(program_input)),std::istream_iterator<byte>());
+
+	std::vector<byte> expression_stack;
+	std::vector<counter> return_stack;
+	std::vector<byte> temp_stack;
+
+	counter program_counter = 0;
+
+	/*std::cout << "program_data: ";
+	for (unsigned int p = 0; p < program_data.size(); p++) {
+		std::cout << (int) program_data[p] << " ";
+	}
+	std::cout << std::endl;
+	std::cout << "------------" << std::endl;*/
+
+	while (program_counter < program_data.size()) {
+
+		execute(program_counter, program_data, expression_stack, return_stack, temp_stack);
+		program_counter += 1;
+	}
+
+	return 0;
+}

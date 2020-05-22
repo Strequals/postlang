@@ -1,0 +1,9 @@
+d2.0 d2.5 d2.0 mult_d mult_d stdio.cout_d
+let pi = d3.141592653589793238462643383279;
+pi stdio.cout_d
+let radius = stdio.cin_f;
+radius stdio.cout_d
+" " stdio.cout
+d2.0 pi radius mult_d mult_d stdio.cout_d
+" " stdio.cout
+pi radius radius mult_d mult_d stdio.cout_d

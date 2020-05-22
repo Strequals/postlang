@@ -1,0 +1,5 @@
+stdio.cin stdio.cout
+stdio.cin_i stdio.cout_i
+stdio.cin_l stdio.cout_l
+stdio.cin_f stdio.cout_f
+stdio.cin_d stdio.cout_d

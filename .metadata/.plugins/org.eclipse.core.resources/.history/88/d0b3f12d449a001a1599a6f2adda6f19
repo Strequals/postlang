@@ -1,0 +1,27 @@
+#include<map>
+typedef unsigned char byte;
+
+static const byte STDIO_ID = 0;
+static std::map<std::string, byte> LIB_MAP = {
+		{"stdio", STDIO_ID}
+};
+static const byte CIN_ID = 0;
+static const byte COUT_ID = 1;
+static const byte CERR_ID = 2;
+static std::map<std::string, byte> STDIO_MAP = {
+		{"cin", CIN_ID},
+		{"cout", COUT_ID},
+		{"cerr", CERR_ID},
+		{"cin_i", CIN_ID+3},
+		{"cout_i", COUT_ID+3},
+		{"cerr_i", CERR_ID+3},
+		{"cin_l", CIN_ID+6},
+		{"cout_l", COUT_ID+6},
+		{"cerr_l", CERR_ID+6},
+		{"cin_f", CIN_ID+9},
+		{"cout_f", COUT_ID+9},
+		{"cerr_f", CERR_ID+9},
+		{"cin_d", CIN_ID+12},
+		{"cout_d", COUT_ID+12},
+		{"cerr_d", CERR_ID+12},
+};

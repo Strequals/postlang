@@ -1,0 +1,75 @@
+#include <iostream>
+
+typedef unsigned char byte;
+
+namespace postlang_stdio {
+byte cin() {
+	byte x;
+	std::cin >> x;
+	return x;
+}
+
+void cout(byte b) {
+	std::cout << b;
+}
+
+void cerr(byte b) {
+	std::cerr << b;
+}
+
+int cin_i(int i) {
+	int x;
+	std::cin >> x;
+	return x;
+}
+
+void cout_i(int i) {
+	std::cout << i;
+}
+
+void cerr_i(int i) {
+	std::cerr << i;
+}
+
+long cin_l() {
+	long x;
+	std::cin >> x;
+	return x;
+}
+
+void cout_l(long l) {
+	std::cout << l;
+}
+
+void cerr_l(long l) {
+	std::cerr << l;
+}
+
+float cin_f() {
+	float x;
+	std::cin >> x;
+	return x;
+}
+
+void cout_f(float f) {
+	std::cout << f;
+}
+
+void cerr_f(float f) {
+	std::cerr << f;
+}
+
+double cin_d() {
+	double x;
+	std::cin >> x;
+	return x;
+}
+
+void cout_d(double d) {
+	std::cout << d;
+}
+
+void cerr_d(double d) {
+	std::cerr << d;
+}
+}

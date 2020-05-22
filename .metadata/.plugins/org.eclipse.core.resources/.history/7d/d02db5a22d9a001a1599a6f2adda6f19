@@ -1,0 +1,24 @@
+#include <vector>
+#include <map>
+#include <regex>
+#include <string>
+
+typedef unsigned char byte;
+typedef unsigned int counter;
+typedef int stack_location;
+
+struct FunctionSource;
+struct VariableData;
+struct InvokePlaceholder;
+struct FunctionData;
+
+typedef std::map<std::string, FunctionData> function_map;
+typedef std::map<std::string, VariableData> variable_map;
+
+
+void compile_token(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, variable_map &variables, unsigned int &stack_location, std::string &token);
+void compile_lambda(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, std::string &l_source);
+void compile_string(std::vector<byte> &compiled, std::string &s);
+void compile_function(std::vector<byte> &compiled, function_map functions, std::vector<InvokePlaceholder> &invokes, FunctionSource &f_source);
+void compile_let(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, variable_map &variables, stack_location &stack_loc, std::string &var_name, std::string &l_source);
+long compile_source(std::vector<byte> &compiled, std::map<std::string, FunctionData> &functions, std::vector<InvokePlaceholder> &invokes, std::map<std::string, VariableData> &variables, stack_location &stack_loc, std::string &source);

@@ -1,0 +1,7 @@
+"Enter the radius of the circle: " 32 <stdio.cout b0> map
+let pi = d3.141592653589793238462643383279;
+let radius = stdio.cin_d;
+"Circumference is: " 18 <stdio.cout b0> map
+d2.0 pi radius mult_d mult_d stdio.cout_d b10 stdio.cout
+"Area is: " 9 <stdio.cout b0> map
+pi radius radius mult_d mult_d stdio.cout_d

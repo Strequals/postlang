@@ -1,0 +1,2 @@
+0 if {"TRUE "} {"FALSE"}
+5 _stdio.cout_ map

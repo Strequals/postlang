@@ -1,0 +1,5 @@
+stdio.cin stdio.cout
+12345 stdio.cout_i
+1234567890 stdio.cout_l
+12.234 stdio.cout_f
+1.414213562373095 stdio.cout_d

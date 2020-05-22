@@ -1,0 +1,15 @@
+define f(int k)(int)
+{
+	k 0 gt_i if
+	{
+		return k 1 sub_i g;
+	}
+	{
+		return 0;
+	}
+}
+define g(int k)(int)
+{
+	return k 1 sub_i f;
+}
+stdio.cin_i f stdio.cout_i

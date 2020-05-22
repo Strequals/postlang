@@ -1,0 +1,1018 @@
+#include <fstream>
+#include <vector>
+#include <map>
+#include <regex>
+#include <string>
+#include <iostream>
+#include <compile.h>
+#include <compile_stdio.h>
+
+typedef unsigned char byte;
+typedef unsigned int counter;
+typedef int stack_location;
+typedef std::map<std::string, FunctionData> function_map;
+typedef std::map<std::string, VariableData> variable_map;
+
+static const byte PUSH = 0;
+static const byte PUSH_N = 1;
+static const byte POP = 2;
+static const byte POP_N = 3;
+static const byte DUP = 4;
+static const byte DUP_N = 5;
+static const byte DUP_X = 6;
+static const byte DUP_X_N = 7;
+static const byte BRANCH = 8;
+static const byte BRANCHGT = 9;
+static const byte BRANCHEQ = 10;
+static const byte INVOKE = 11;
+static const byte RETURN = 12;
+static const byte INVOKE_RETURN = 13;
+static const byte MAP = 14;
+static const byte MAP_N = 15;
+static const byte AND = 16;
+static const byte NAND = 17;
+static const byte OR = 18;
+static const byte NOR = 19;
+static const byte NOT = 20;
+static const byte XOR = 21;
+static const byte ADD = 22;
+static const byte SUB = ADD+1;
+static const byte MULT = SUB+1;
+static const byte DIV = MULT+1;
+static const byte ADD_I = 26;
+static const byte SUB_I = ADD_I+1;
+static const byte MULT_I = SUB_I+1;
+static const byte DIV_I = MULT_I+1;
+static const byte ADD_L = 30;
+static const byte SUB_L = ADD_L+1;
+static const byte MULT_L = SUB_L+1;
+static const byte DIV_L = MULT_L+1;
+static const byte ADD_F = 34;
+static const byte SUB_F = ADD_F+1;
+static const byte MULT_F = SUB_F+1;
+static const byte DIV_F = MULT_F+1;
+static const byte ADD_D = 38;
+static const byte SUB_D = ADD_D+1;
+static const byte MULT_D = SUB_D+1;
+static const byte DIV_D = MULT_D+1;
+static const byte EQ = 42;
+static const byte NEQ = EQ+1;
+static const byte GT = NEQ+1;
+static const byte GE = GT+1;
+static const byte LT = GE+1;
+static const byte LE = LT+1;
+static const byte EQ_I = 48;
+static const byte NEQ_I = EQ_I+1;
+static const byte GT_I = NEQ_I+1;
+static const byte GE_I = GT_I+1;
+static const byte LT_I = GE_I+1;
+static const byte LE_I = LT_I+1;
+static const byte EQ_L = 54;
+static const byte NEQ_L = EQ_L+1;
+static const byte GT_L = NEQ_L+1;
+static const byte GE_L = GT_L+1;
+static const byte LT_L = GE_L+1;
+static const byte LE_L = LT_L+1;
+static const byte EQ_F = 60;
+static const byte NEQ_F = EQ_F+1;
+static const byte GT_F = NEQ_F+1;
+static const byte GE_F = GT_F+1;
+static const byte LT_F = GE_F+1;
+static const byte LE_F = LT_F+1;
+static const byte EQ_D = 66;
+static const byte NEQ_D = EQ_D+1;
+static const byte GT_D = NEQ_D+1;
+static const byte GE_D = GT_D+1;
+static const byte LT_D = GE_D+1;
+static const byte LE_D = LT_D+1;
+static const byte INVOKE_INTERNAL = 255;
+
+
+static std::map<std::string, byte> LIB_MAP = {
+		{"stdio", STDIO_ID}
+};
+
+union {
+	float f;
+	byte bytes[4];
+} float_converter;
+
+union {
+	double d;
+	byte bytes[8];
+} double_converter;
+
+
+
+static std::map<std::string, std::pair<byte,int>> BYTECODE_MAP = {
+		{"discard", std::pair<byte,int>(POP,-1)},
+		{"map", std::pair<byte,int>(MAP,-8)},
+		{"add", std::pair<byte,int>(ADD,-1)},
+		{"sub", std::pair<byte,int>(SUB,-1)},
+		{"mult", std::pair<byte,int>(MULT,-1)},
+		{"div", std::pair<byte,int>(DIV,-1)},
+		{"add_i", std::pair<byte,int>(ADD_I,-4)},
+		{"sub_i", std::pair<byte,int>(SUB_I,-4)},
+		{"mult_i", std::pair<byte,int>(MULT_I,-4)},
+		{"div_i", std::pair<byte,int>(DIV_I,-4)},
+		{"add_l", std::pair<byte,int>(ADD_L,-8)},
+		{"sub_l", std::pair<byte,int>(SUB_L,-8)},
+		{"mult_l", std::pair<byte,int>(MULT_L,-8)},
+		{"div_l", std::pair<byte,int>(DIV_L,-8)},
+		{"add_f", std::pair<byte,int>(ADD_F,-4)},
+		{"sub_f", std::pair<byte,int>(SUB_F,-4)},
+		{"mult_f", std::pair<byte,int>(MULT_F,-4)},
+		{"div_f", std::pair<byte,int>(DIV_F,-4)},
+		{"add_d", std::pair<byte,int>(ADD_D,-8)},
+		{"sub_d", std::pair<byte,int>(SUB_D,-8)},
+		{"mult_d", std::pair<byte,int>(MULT_D,-8)},
+		{"div_d", std::pair<byte,int>(DIV_D,-8)},
+		{"eq", std::pair<byte,int>(EQ,-1)},
+		{"neq", std::pair<byte,int>(NEQ,-1)},
+		{"gt", std::pair<byte,int>(GT,-1)},
+		{"ge", std::pair<byte,int>(GE,-1)},
+		{"lt", std::pair<byte,int>(LT,-1)},
+		{"le", std::pair<byte,int>(LE,-1)},
+		{"eq_i", std::pair<byte,int>(EQ_I,-7)},
+		{"neq_i", std::pair<byte,int>(NEQ_I,-7)},
+		{"gt_i", std::pair<byte,int>(GT_I,-7)},
+		{"ge_i", std::pair<byte,int>(GE_I,-7)},
+		{"lt_i", std::pair<byte,int>(LT_I,-7)},
+		{"le_i", std::pair<byte,int>(LE_I,-7)},
+		{"eq_l", std::pair<byte,int>(EQ_L,-15)},
+		{"neq_l", std::pair<byte,int>(NEQ_L,-15)},
+		{"gt_l", std::pair<byte,int>(GT_L,-15)},
+		{"ge_l", std::pair<byte,int>(GE_L,-15)},
+		{"lt_l", std::pair<byte,int>(LT_L,-15)},
+		{"le_l", std::pair<byte,int>(LE_L,-15)},
+		{"eq_f", std::pair<byte,int>(EQ_F,-7)},
+		{"neq_f", std::pair<byte,int>(NEQ_F,-7)},
+		{"gt_f", std::pair<byte,int>(GT_F,-7)},
+		{"ge_f", std::pair<byte,int>(GE_F,-7)},
+		{"lt_f", std::pair<byte,int>(LT_F,-7)},
+		{"le_f", std::pair<byte,int>(LE_F,-7)},
+		{"eq_d", std::pair<byte,int>(EQ_D,-15)},
+		{"neq_d", std::pair<byte,int>(NEQ_D,-15)},
+		{"gt_d", std::pair<byte,int>(GT_D,-15)},
+		{"ge_d", std::pair<byte,int>(GE_D,-15)},
+		{"lt_d", std::pair<byte,int>(LT_D,-15)},
+		{"le_d", std::pair<byte,int>(LE_D,-15)},
+};
+
+struct FunctionSource {
+	std::string name;
+	std::string params;
+	std::string body;
+};
+
+struct InvokePlaceholder {
+	std::string function_name;
+	counter location;
+};
+
+struct VariableData {
+	stack_location loc;
+	byte len;
+};
+
+struct FunctionData {
+	counter loc;
+	byte param_len;
+	byte return_len;
+};
+
+enum CompileState {
+	TOKEN, STRING, LAMBDA
+};
+
+/**
+ * Removes whitespace from the beginning and end of s
+ */
+void trim(std::string &s) {
+	if (s.length() == 0) return;
+	unsigned int i = 0;
+	for (i = 0; i < s.length(); i++) {
+		if (!std::isspace(s[i])) {
+			break;
+		}
+	}
+	unsigned int j = s.length();
+	for (j = s.length()-1; j > i; j--) {
+		if (!std::isspace(s[j])) {
+			break;
+		}
+	}
+	s.erase(j+1);
+	s.erase(0,i);
+}
+
+/**
+ * Returns a trimmed copy of s
+ */
+std::string trim_copy(std::string &s) {
+	unsigned int i = 0;
+	for (i = 0; i < s.length(); i++) {
+		if (!std::isspace(s[i])) {
+			break;
+		}
+	}
+	unsigned int j = s.length();
+	for (j = s.length()-1; j > i; j--) {
+		if (!std::isspace(s[j])) {
+			break;
+		}
+	}
+	return s.substr(i,j-i+1);
+}
+
+std::pair<int, int> matching_brackets(char open, char close, std::string &source, int begin) {
+	int x = source.find(open, begin);
+	int k = x+1;
+	int nested = 1;
+	char at;
+	while (nested > 0 && k < source.length()) {
+		at = source.at(k);
+		std::cout << at << std::endl;
+		if (at == open) nested++;
+		if (at == close) nested--;
+		k++;
+	}
+	return std::pair<int, int>(x, k-1);
+
+}
+
+byte size_of(std::string &type) {
+	std::cout << "getting size of type: " << type << std::endl;
+	if (type == "byte") return 1;
+	if (type == "int") return 4;
+	if (type == "long") return 8;
+	if (type == "float") return 4;
+	if (type == "double") return 8;
+	return std::stoi(type);
+}
+
+byte byte_count(std::string &s) {
+	std::size_t x;
+	unsigned int begin = 0;
+	byte size = 0;
+	while ((x = s.find(',',begin)) != std::string::npos) {
+		std::string t = s.substr(begin,x);
+		trim(t);
+		size_t y = t.find(' ');
+		if (y != std::string::npos) t=t.substr(y);
+		size += size_of(t);
+		begin = x+1;
+	}
+	std::string t = s.substr(begin);
+	trim(t);
+	std::size_t y = t.find(' ');
+	if (y != std::string::npos) t=t.substr(y);
+	return size + size_of(t);
+}
+
+byte parse_parameters(variable_map &variables, std::string &s) {
+	std::size_t x;
+	unsigned int begin = s.length();
+	byte size = 0;
+	byte x_size;
+	while ((x = s.find_last_of(',',begin)) != std::string::npos) {
+		std::string v = s.substr(x+1,begin-x);
+		trim(v);
+		size_t y = v.find(' ');
+		std::string var_type = v.substr(0,y);
+		std::cout << "v: " << v  << " vt: " << var_type;
+		trim(var_type);
+		VariableData vd;
+		x_size = size_of(var_type);
+		vd.len = x_size;
+		size += x_size;
+		vd.loc = -size;
+		std::string var_name = v.substr(y+1);
+		trim(var_name);
+		variables[var_name] = vd;
+		begin = x-1;
+	}
+	std::string v = s.substr(0,begin+1);
+	trim(v);
+	std::size_t y = v.find(' ');
+	std::string var_type = v.substr(0,y);
+	VariableData vd;
+	x_size = size_of(var_type);
+	vd.len = x_size;
+	size += x_size;
+	vd.loc = -size;
+	std::string var_name = v.substr(y+1);
+	trim(var_name);
+	variables[var_name] = vd;
+	return size + x_size;
+}
+
+void handle_error(std::string &message) {
+	//TODO: handle errors
+}
+
+byte map_v(std::map<std::string, byte> &m, std::string &key) {
+	std::map<std::string, byte>::iterator iter = m.find(key);
+	if (iter != m.end()) {
+		return iter -> second;
+	} else {
+		std::string err_message = key + " not recognized.";
+		handle_error(err_message);
+		return 0;
+	}
+}
+
+/**
+ * like map_v, but instead of handling errors itself, returns a flag that is true if mapping is successful
+ */
+std::pair<byte,bool> map_v_safe(std::map<std::string, byte> &m, std::string &key) {
+	std::map<std::string, byte>::iterator iter = m.find(key);
+	std::pair<byte,bool> x;
+	if (iter != m.end()) {
+		x.first = iter -> second;
+		x.second = true;
+		return x;
+	} else {
+		x.first = 0;
+		x.second = false;
+		return x;
+	}
+}
+
+std::pair<std::pair<byte, int>,bool> get_bytecode(std::string &key) {
+	std::map<std::string, std::pair<byte,int>>::iterator iter = BYTECODE_MAP.find(key);
+	std::pair<std::pair<byte,int>,bool> x;
+	if (iter != BYTECODE_MAP.end()) {
+		x.first = iter -> second;
+		x.second = true;
+		return x;
+	} else {
+		x.second = false;
+		return x;
+	}
+}
+
+std::pair<VariableData,bool> get_variable(variable_map v_map, std::string &key) {
+	variable_map::iterator iter = v_map.find(key);
+	std::pair<VariableData,bool> x;
+	if (iter != v_map.end()) {
+		x.first = iter -> second;
+		x.second = true;
+		return x;
+	} else {
+		x.second = false;
+		return x;
+	}
+}
+
+std::pair<FunctionData,bool> get_function(function_map f_map, std::string &key) {
+	function_map::iterator iter = f_map.find(key);
+	std::pair<FunctionData,bool> x;
+	if (iter != f_map.end()) {
+		x.first = iter -> second;
+		x.second = true;
+		return x;
+	} else {
+		x.second = false;
+		return x;
+	}
+}
+
+static const std::regex BYTE_TYPE_C("['].[']");
+static const std::regex BYTE_TYPE_N("b[0-9]+");
+static const std::regex INT_TYPE_G("[-|+]?[0-9]+");
+static const std::regex INT_TYPE("i[-|+]?[0-9]+");
+static const std::regex LONG_TYPE("l[-|+]?[0-9]+");
+static const std::regex FLOAT_TYPE_G("[-|+]?[0-9]+[.]?[0-9]+");
+static const std::regex FLOAT_TYPE("f[-|+]?[0-9]+[.]?[0-9]+");
+static const std::regex DOUBLE_TYPE("d[-|+]?[0-9]+[.]?[0-9]+");
+static const std::regex EXTERNAL_CALL("[a-z0-9_]+[.][a-z0-9_]+");
+static const std::regex MAP_N_CALL("[map^][0-9]+");
+static const std::regex MAP_T_CALL("[map^][a-z]+");
+/**
+ * Compiles the token into compiled and returns the change in stack height as a result of executing the token
+ */
+void compile_token(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, variable_map &variables, stack_location &stack_loc, std::string &token) {
+	std::cout << "Compiling token: " << token << std::endl;
+	if (std::regex_match(token, BYTE_TYPE_C)) {
+		std::cout << "byte token: " << token << std::endl;
+		compiled.push_back(PUSH);
+		stack_loc++;
+		compiled.push_back((byte)token.at(1));
+	} else if (std::regex_match(token, BYTE_TYPE_N)) {
+		std::cout << "byte token: " << token << std::endl;
+		compiled.push_back(PUSH);
+		compiled.push_back((byte) std::stoi(token.substr(1)));
+		stack_loc++;
+	} else if (std::regex_match(token, INT_TYPE_G)) {
+		std::cout << "int token: " << token << std::endl;
+		errno = 0;
+		long int_value = std::stol(token);
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of int range";
+			handle_error(s);
+		}
+		compiled.push_back(PUSH_N);
+		compiled.push_back(4);
+		compiled.push_back((int_value >> 24) & 0xFF);
+		compiled.push_back((int_value >> 16) & 0xFF);
+		compiled.push_back((int_value >> 8) & 0xFF);
+		compiled.push_back((int_value) & 0xFF);
+		stack_loc += 4;
+	} else if (std::regex_match(token, INT_TYPE)) {
+		std::cout << "int token: " << token << std::endl;
+		errno = 0;
+		long int_value = std::stol(token.substr(1));
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of int range";
+			handle_error(s);
+		}
+		compiled.push_back(PUSH_N);
+		compiled.push_back(4);
+		compiled.push_back((int_value >> 24) & 0xFF);
+		compiled.push_back((int_value >> 16) & 0xFF);
+		compiled.push_back((int_value >> 8) & 0xFF);
+		compiled.push_back((int_value) & 0xFF);
+		stack_loc += 4;
+	} else if (std::regex_match(token, LONG_TYPE)) {
+		std::cout << "long token: " << token << std::endl;
+		errno = 0;
+		long long int long_value = std::stoll(token.substr(1));
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of long range";
+			handle_error(s);
+		}
+		compiled.push_back(PUSH_N);
+		compiled.push_back(8);
+		compiled.push_back((long_value >> 56) & 0xFF);
+		compiled.push_back((long_value >> 48) & 0xFF);
+		compiled.push_back((long_value >> 40) & 0xFF);
+		compiled.push_back((long_value >> 32) & 0xFF);
+		compiled.push_back((long_value >> 24) & 0xFF);
+		compiled.push_back((long_value >> 16) & 0xFF);
+		compiled.push_back((long_value >> 8) & 0xFF);
+		compiled.push_back((long_value) & 0xFF);
+		stack_loc += 8;
+	} else if (std::regex_match(token, FLOAT_TYPE_G)) {
+		std::cout << "float token: " << token << std::endl;
+		errno = 0;
+		float float_value = std::stof(token);
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of float range";
+			handle_error(s);
+		}
+		float_converter.f = float_value;
+		compiled.push_back(PUSH_N);
+		compiled.push_back(4);
+		compiled.push_back(float_converter.bytes[0]);
+		compiled.push_back(float_converter.bytes[1]);
+		compiled.push_back(float_converter.bytes[2]);
+		compiled.push_back(float_converter.bytes[3]);
+		stack_loc += 4;
+	} else if (std::regex_match(token, FLOAT_TYPE)) {
+		std::cout << "float token: " << token << std::endl;
+		errno = 0;
+		float float_value = std::stof(token.substr(1));
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of float range";
+			handle_error(s);
+		}
+		float_converter.f = float_value;
+		compiled.push_back(PUSH_N);
+		compiled.push_back(4);
+		compiled.push_back(float_converter.bytes[0]);
+		compiled.push_back(float_converter.bytes[1]);
+		compiled.push_back(float_converter.bytes[2]);
+		compiled.push_back(float_converter.bytes[3]);
+		stack_loc += 4;
+	} else if (std::regex_match(token, DOUBLE_TYPE)) {
+		std::cout << "double token: " << token << std::endl;
+		errno = 0;
+		double double_value = std::stod(token.substr(1));
+		if (errno == ERANGE) {
+			std::string s = "token " + token + " out of double range";
+			handle_error(s);
+		}
+		double_converter.d = double_value;
+		compiled.push_back(PUSH_N);
+		compiled.push_back(8);
+		compiled.push_back(double_converter.bytes[0]);
+		compiled.push_back(double_converter.bytes[1]);
+		compiled.push_back(double_converter.bytes[2]);
+		compiled.push_back(double_converter.bytes[3]);
+		compiled.push_back(double_converter.bytes[4]);
+		compiled.push_back(double_converter.bytes[5]);
+		compiled.push_back(double_converter.bytes[6]);
+		compiled.push_back(double_converter.bytes[7]);
+		stack_loc += 8;
+	} else if (std::regex_match(token, EXTERNAL_CALL)) {
+		std::cout << "call token: " << token << std::endl;
+
+		unsigned int x = token.find('.');
+		std::string lib_name = token.substr(0,x);
+		std::string f_name = token.substr(x+1);
+
+		compiled.push_back(255);
+		byte lib_id = map_v(LIB_MAP, lib_name);
+		byte func_id;
+		compiled.push_back(lib_id);
+		switch (lib_id) {
+		case STDIO_ID:
+			func_id = map_v(STDIO_MAP, f_name);
+			compiled.push_back(func_id);
+			switch (func_id) {
+			case CIN_ID:
+				stack_loc++;
+				break;
+			case COUT_ID:
+				stack_loc--;
+				break;
+			case CERR_ID:
+				stack_loc--;
+				break;
+			case CIN_I_ID:
+				stack_loc+=4;
+				break;
+			case COUT_I_ID:
+				stack_loc-=4;
+				break;
+			case CERR_I_ID:
+				stack_loc-=4;
+				break;
+			case CIN_L_ID:
+				stack_loc+=8;
+				break;
+			case COUT_L_ID:
+				stack_loc-=8;
+				break;
+			case CERR_L_ID:
+				stack_loc-=8;
+				break;
+			case CIN_F_ID:
+				stack_loc+=4;
+				break;
+			case COUT_F_ID:
+				stack_loc-=4;
+				break;
+			case CERR_F_ID:
+				stack_loc-=4;
+				break;
+			case CIN_D_ID:
+				stack_loc+=8;
+				break;
+			case COUT_D_ID:
+				stack_loc-=8;
+				break;
+			case CERR_D_ID:
+				stack_loc-=8;
+				break;
+			}
+			break;
+		}
+	} else {
+
+
+		std::pair<VariableData, bool> v_map = get_variable(variables, token);
+		if (v_map.second) {
+			std::cout << "variable token: " << token << std::endl;
+			VariableData &vd = v_map.first;
+			compiled.push_back(DUP_X_N);
+			stack_location x = stack_loc - vd.loc;
+			compiled.push_back((x >> 24) & 0xFF);
+			compiled.push_back((x >> 16) & 0xFF);
+			compiled.push_back((x >> 8) & 0xFF);
+			compiled.push_back((x) & 0xFF);
+			compiled.push_back(vd.len);
+			stack_loc += vd.len;
+			return;
+		}
+
+		std::pair<FunctionData, bool> f_map = get_function(functions, token);
+		if (f_map.second) {
+			std::cout << "function token: " << token << std::endl;
+			FunctionData &fd = f_map.first;
+			compiled.push_back(INVOKE);
+
+			InvokePlaceholder ip;
+			ip.function_name = token;
+			ip.location = compiled.size();
+
+			compiled.push_back(0);
+			compiled.push_back(0);
+			compiled.push_back(0);
+			compiled.push_back(0);
+
+			invokes.push_back(ip);
+			return;
+		}
+
+
+		std::pair<std::pair<byte, int>, bool> bc_map = get_bytecode(token);
+		if (bc_map.second) {
+			std::cout << "call token: " << token << std::endl;
+			compiled.push_back(bc_map.first.first);
+			stack_loc += bc_map.first.second;
+			switch (bc_map.first.first) {
+			//handle extra bytes here
+			}
+		} else {
+			//handle special calls
+			if (std::regex_match(token, MAP_N_CALL)) {
+
+			} else if (std::regex_match(token, MAP_T_CALL)) {
+
+			}
+		}
+
+	}
+}
+
+void compile_lambda(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, std::string &l_source) {
+	compiled.push_back(PUSH_N);
+	compiled.push_back(4);
+
+	unsigned int lambda_location = compiled.size() + 9;
+
+	compiled.push_back((lambda_location >> 24) & 0xFF);
+	compiled.push_back((lambda_location >> 16) & 0xFF);
+	compiled.push_back((lambda_location >> 8) & 0xFF);
+	compiled.push_back((lambda_location) & 0xFF);
+
+	compiled.push_back(BRANCH);
+
+	counter branch_location = compiled.size();
+	compiled.push_back(0);
+	compiled.push_back(0);
+	compiled.push_back(0);
+	compiled.push_back(0);
+
+	l_source = l_source + "\n";
+	variable_map variables;
+	stack_location stack_loc = 0;
+	long v = compile_source(compiled, functions, invokes, variables, stack_loc, l_source);
+	if (v < 0) v = 0;
+	compiled.push_back(RETURN);
+	compiled.push_back(v);
+	compiled.push_back(0);
+
+	unsigned int branch_destination = compiled.size();
+
+	compiled[branch_location] = (branch_destination >> 24) & 0xFF;
+	compiled[branch_location+1] = (branch_destination >> 16) & 0xFF;
+	compiled[branch_location+2] = (branch_destination >> 8) & 0xFF;
+	compiled[branch_location+3] = (branch_destination) & 0xFF;
+}
+
+void compile_string(std::vector<byte> &compiled, stack_location &stack_loc, std::string &s) {
+	if (s.length()==0) return;
+	unsigned int i = 0;
+	while (i < s.length()) {
+		if (i % 255 == 0) {
+			compiled.push_back(1);
+			unsigned int x = s.length()-i;
+			if (x > 255) x = 255;
+			compiled.push_back((byte) x);
+		}
+		compiled.push_back((byte) s.at(i));
+		stack_loc++;
+		i++;
+	}
+
+
+
+}
+
+long f_param_size = -1;
+long f_return_size = -1;
+FunctionData compile_function(std::vector<byte> &compiled, function_map functions, std::vector<InvokePlaceholder> &invokes, FunctionSource &f_source) {
+	std::cout << "Compiling Function: " << std::endl;
+	std::cout << "----------------------------------------" << std::endl;
+	std::cout << f_source.name << std::endl;
+	std::cout << f_source.params << std::endl;
+	std::cout << f_source.body << std::endl;
+	variable_map variables;
+
+	byte parameter_size = parse_parameters(variables, f_source.params);
+	counter f_loc = compiled.size()+5;
+
+	stack_location s_loc = 0;
+
+	f_param_size = parameter_size;
+
+	compile_source(compiled, functions, invokes, variables, s_loc, f_source.body);
+
+	FunctionData fd;
+	fd.loc = f_loc;
+	fd.param_len = parameter_size;
+	fd.return_len = f_return_size;
+
+	f_param_size = -1;
+	f_return_size = -1;
+	std::cout << "----------------------------------------" << std::endl;
+	return fd;
+}
+
+void compile_let(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, variable_map &variables, stack_location &stack_loc, std::string &var_name, std::string &l_source) {
+	VariableData v_data;
+	v_data.loc = stack_loc;
+	std::string trimmed_name = trim_copy(var_name);
+
+	stack_location sl_0 = stack_loc;
+	std::cout << "Compiling let: name - " << trimmed_name << ", code:" << l_source << std::endl;
+
+	l_source += "\n";
+	long sl_1 = compile_source(compiled, functions, invokes, variables, stack_loc, l_source);
+
+	v_data.len = sl_1 - sl_0;
+
+
+	variables[trimmed_name] = v_data;
+}
+
+long compile_source(std::vector<byte> &compiled, function_map &functions, std::vector<InvokePlaceholder> &invokes, variable_map &variables, stack_location &stack_loc, std::string &source) {
+	std::cout << "Compiling Source: " << std::endl;
+	std::cout << "----------------------------------------" << std::endl;
+
+	CompileState state = TOKEN;
+	unsigned int begin = 0;
+	bool processToken;
+	std::string token;
+	char char_at;
+	for (unsigned int i = 0; i < source.length(); i++) {
+		char_at = source[i];
+		//std::cout << char_at << std::endl;
+		processToken = false;
+		switch (state) {
+		case TOKEN:
+			if (char_at == '\"') {
+				token = source.substr(begin, i-begin);
+				begin = i+1;
+				processToken = true;
+				state = STRING;
+			} else if (char_at == '<' && i==begin) {
+				begin = i+1;
+				state = LAMBDA;
+			} else {
+				if (std::isspace(char_at)) {
+					token = source.substr(begin, i-begin);
+					begin = i+1;
+					processToken = true;
+				}
+			}
+			break;
+		case STRING:
+			if (char_at == '\"') {
+				token = source.substr(begin, i-begin);
+				std::cout << "Compiling string: " << token << std::endl;
+				begin=i+1;
+				compile_string(compiled, stack_loc, token);
+				state = TOKEN;
+			} else {
+
+			}
+			break;
+		case LAMBDA:
+			if (char_at == '>') {
+				token = source.substr(begin, i-begin);
+				std::cout << "Compiling lambda: " << token << std::endl;
+				begin=i+1;
+				compile_lambda(compiled, functions, invokes, token);
+				stack_loc+=4;
+				state = TOKEN;
+			} else {
+
+			}
+			break;
+		}
+
+		if (processToken) {
+			trim(token);
+
+			if (token == "let") {
+				std::cout << "compiling let:" << std::endl;
+				int x = source.find('=',i);
+				int end = source.find(';',x);
+				std::string v_name = source.substr(i,x-i);
+				std::string v_source = source.substr(x+1,end-x-1);
+				compile_let(compiled, functions, invokes, variables, stack_loc, v_name, v_source);
+				i=end+1;
+				begin=end+1;
+			} else if (token == "if") {
+				std::cout << "compiling if:" << std::endl;
+				stack_loc--;
+				compiled.push_back(BRANCHEQ);
+				int b1 = compiled.size();
+				compiled.push_back(0);
+				compiled.push_back(0);
+				compiled.push_back(0);
+				compiled.push_back(0);
+				std::pair<int, int> true_brackets = matching_brackets('{','}',source,i);
+				int true_open = true_brackets.first;
+				int true_close = true_brackets.second;
+				std::pair<int, int> false_brackets = matching_brackets('{','}',source,true_close);
+				int false_open = false_brackets.first;
+				int false_close = false_brackets.second;
+				std::string true_source = source.substr(true_open+1, true_close - true_open);
+				true_source += "\n";
+				std::string false_source = source.substr(false_open+1, false_close - false_open);
+				false_source += "\n";
+
+				variable_map v_copy_true(variables);
+				stack_location s_loc_true = stack_loc;
+				stack_location true_loc = compile_source(compiled, functions, invokes, v_copy_true, s_loc_true, true_source);
+
+				compiled.push_back(BRANCH);
+				int b2 = compiled.size();
+				compiled.push_back(0);
+				compiled.push_back(0);
+				compiled.push_back(0);
+				compiled.push_back(0);
+
+				size_t d1 = compiled.size();
+				compiled[b1] = (d1 >> 24) & 0xFF;
+				compiled[b1+1] = (d1 >> 16) & 0xFF;
+				compiled[b1+2] = (d1 >> 8) & 0xFF;
+				compiled[b1+3] = (d1) & 0xFF;
+				variable_map v_copy_false(variables);
+				stack_location s_loc_false = stack_loc;
+				stack_location false_loc = compile_source(compiled, functions, invokes, v_copy_false, s_loc_false, false_source);
+
+				size_t d2 = compiled.size();
+				compiled[b2] = (d2 >> 24) & 0xFF;
+				compiled[b2+1] = (d2 >> 16) & 0xFF;
+				compiled[b2+2] = (d2 >> 8) & 0xFF;
+				compiled[b2+3] = (d2) & 0xFF;
+
+				if (false_loc != true_loc) {
+					std::cerr << "Warning: conditional does not evaluate to same lengths, variables may be invalid." << std::endl;
+				}
+
+				stack_loc += true_loc;
+				i = false_close+1;
+				begin = i;
+			} else if (token == "cond") {
+
+			} else if (token == "and") {
+
+			} else if (token == "or") {
+
+			} else if (token == "return") {
+				int end = source.find(";",i);
+				std::string return_source = source.substr(i,end-i);
+				std::cout << "ret source: " << return_source;
+				long ret_size = compile_source(compiled, functions, invokes, variables, stack_loc, return_source);
+				f_return_size = ret_size;
+				compiled.push_back(RETURN);
+				compiled.push_back(f_return_size);
+				compiled.push_back(f_param_size);
+				i=end+1;
+				begin=end+1;
+			} else if (token == "return_invoke") {
+
+			}
+
+			else if (token.length() > 0) compile_token(compiled, functions, invokes, variables, stack_loc, token);
+			std::cout << "stack is at " << stack_loc << std::endl;
+		}
+	}
+	std::cout << "----------------------------------------" << std::endl;
+
+	return stack_loc;
+}
+
+void compile(std::vector<byte>	&compiled, std::string &source) {
+	function_map functions;
+	std::vector<FunctionSource> f_sources;
+
+	unsigned int function_define_location;
+	const int define_length = 7;
+	int pass_location = 0;
+	int removed_count = 0;
+	std::string source_main(source);
+	while ((function_define_location = source.find("define ", pass_location)) != std::string::npos) {
+		if (function_define_location > 0) {
+			char &prev_char = source[function_define_location-1];
+			if (!std::isspace(prev_char)) {
+				pass_location = function_define_location+7;
+				continue;
+			}
+		}
+
+		std::pair<int,int> param_brackets = matching_brackets('(',')',source,function_define_location);
+		int open_param_location = param_brackets.first;
+		int close_param_location = param_brackets.second;
+		std::pair<int,int> source_brackets = matching_brackets('{','}',source,function_define_location);
+		int open_source_location = source_brackets.first;
+		int close_source_location = source_brackets.second;
+
+		FunctionSource f_source;
+		f_source.name = source.substr(function_define_location+define_length, open_param_location-function_define_location-define_length);
+		trim(f_source.name);
+		f_source.params = source.substr(open_param_location+1,close_param_location-open_param_location-1);
+		f_source.body = source.substr(open_source_location+1,close_source_location-open_source_location-1);
+
+		f_sources.push_back(f_source);
+
+		functions[f_source.name];
+
+		int n = close_source_location-function_define_location+1;
+		source_main.erase(function_define_location-removed_count, n);
+		removed_count += n;
+
+		pass_location = close_source_location+1;
+	}
+
+	std::vector<InvokePlaceholder> invokes;
+	const int header_size = 5;
+	for (FunctionSource &f_source : f_sources) {
+		counter location = compiled.size();
+		const FunctionData &fd = compile_function(compiled, functions, invokes, f_source);
+		functions[f_source.name] = fd;
+	}
+
+	if (compiled.size() > 0) {
+		counter x = compiled.size() + 5;
+		compiled.insert(std::begin(compiled), (x) & 0xFF);
+		compiled.insert(std::begin(compiled), (x >> 8) & 0xFF);
+		compiled.insert(std::begin(compiled), (x >> 16) & 0xFF);
+		compiled.insert(std::begin(compiled), (x >> 24) & 0xFF);
+		compiled.insert(std::begin(compiled), BRANCH);
+	}
+
+	variable_map v_map;
+	stack_location s_loc = 0;
+	compile_source(compiled, functions, invokes, v_map, s_loc, source_main);
+
+	for (InvokePlaceholder &ip : invokes) {
+		FunctionData &fd = functions[ip.function_name];
+		std::cout << "replacing placeholder for function " << ip.function_name << " at " << ip.location << std::endl;
+		compiled[ip.location] = (fd.loc >> 24) & 0xFF;
+		compiled[ip.location+1] = (fd.loc >> 16) & 0xFF;
+		compiled[ip.location+2] = (fd.loc >> 8) & 0xFF;
+		compiled[ip.location+3] = (fd.loc) & 0xFF;
+	}
+
+	//TODO: replace placeholders
+}
+
+void runTest() {
+	std::ofstream out("test.post", std::ios::binary);
+
+	//dup test
+	//unsigned char x[]={1,8,3,1,4,1,5,9,2,6, 254, 7,0,0,0,7,8, 255, 6,0,0,0,7, 254};
+
+	//branch test
+	//unsigned char x[]={0,0, 9,0,0,0,15, 0,0,254, 8,0,0,0,18, 0,1,254};
+
+	//invoke/return test
+	//unsigned char x[]={8,0,0,0,18, 1,8,3,1,4,1,5,9,2,6, 11,8,1, 0,1,254, 10,0,0,0,5, 254};
+
+	//byte-binaryops test
+	//unsigned char x[]={1,2,100,0, 254, 12, 254, 2, 1,2,100,0, 254, 13, 254, 2, 1,2,100,0, 255, 14, 254, 2, 1,2,100,0, 254, 15, 254};
+
+	//invoke_external test
+	//unsigned char x[] = {1,2,'i','h',255,0,1,255,0,1};
+
+	//map test
+	unsigned char x[]={1,12,'H','e','l','l','o',' ','W','o','r','l','d','!', //0-13
+			0,12, //14-15
+			1,4,0,0,0,27, //16-21
+			8,0,0,0,33, //22-26
+			255,0,1,11,0,0, //27-32
+			12 //33
+	};
+	out.write((char*)&x,sizeof(x));
+	out.close();
+}
+
+int main(int argc, char *argv[]) {
+	if (argc != 2) return 0;
+	std::string source_file(argv[1]);
+	std::ifstream in(source_file);
+	std::string program_source;
+
+	in.seekg(0, std::ios::end);
+	program_source.reserve(in.tellg());
+	in.seekg(0, std::ios::beg);
+
+	program_source.assign((std::istreambuf_iterator<char>(in)),
+			std::istreambuf_iterator<char>());
+
+	std::vector<byte> compiled;
+	program_source += "\n";
+	compile(compiled, program_source);
+	//std::cout << compiled[0] << std::endl;
+
+	std::cout << "####################################" << std::endl;
+	std::cout << "Compiled: " << std::endl;
+
+	for (unsigned int i = 0; i < compiled.size(); i++) {
+		std::cout << i << ": " << (int) compiled[i] << std::endl;
+	}
+
+	unsigned int k = source_file.find_last_of(".");
+	std::string compiled_file = source_file.substr(0,k) + ".postc";
+	std::ofstream out(compiled_file, std::ios::binary);
+	out.write((char*)&compiled[0], compiled.size());
+	out.close();
+}

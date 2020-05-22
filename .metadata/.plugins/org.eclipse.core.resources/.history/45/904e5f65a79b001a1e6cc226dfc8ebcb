@@ -1,0 +1,7 @@
+let x = b1;
+x if {
+	stdio.cin_i stdio.cin_i add_i stdio.cout_i
+}
+{
+	stdio.cin_i stdio.cin_i mult_i stdio.cout_i
+}

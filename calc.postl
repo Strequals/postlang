@@ -1,0 +1,21 @@
+let x = stdio.cin_i;
+x 0 gt_i if
+{
+	x 1 gt_i if
+	{
+		x 2 gt_i if
+		{
+			stdio.cin_i stdio.cin_i div_i
+		}
+		{
+			stdio.cin_i stdio.cin_i mult_i
+		}
+	}
+	{
+		stdio.cin_i stdio.cin_i sub_i
+	}
+}
+{
+	stdio.cin_i stdio.cin_i add_i
+}
+stdio.cout_i

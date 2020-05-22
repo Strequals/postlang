@@ -1,0 +1,10 @@
+let x = b1;
+x stdio.cout_i
+x if {
+	discard discard discard
+	x stdio.cout_i
+}
+{
+	discard discard discard
+	x 1 add_i stdio.cout_i
+}

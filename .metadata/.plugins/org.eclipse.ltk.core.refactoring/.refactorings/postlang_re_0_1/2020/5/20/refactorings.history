@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;postlang_re_0_1/src/stdio&apos; to &apos;postlang_stdio.h&apos;" description="Rename resource &apos;stdio&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="src/stdio" name="postlang_stdio.h" stamp="1589180816712" updateReferences="true"/>
+</session>

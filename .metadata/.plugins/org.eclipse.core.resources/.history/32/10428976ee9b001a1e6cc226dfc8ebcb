@@ -1,0 +1,39 @@
+define abs (double x) (double)
+{
+	x 0.0d lt_d if
+	{
+		return 0.0 x sub_d;
+	}
+	{
+		return x;
+	}
+}
+
+define sqrt_diff (double x, double guess) (double)
+{
+	return x x mult_d guess sub_d abs;
+}
+
+define newton_step (double x, double guess) (double)
+{
+	return x guess x div_d add_d 2.0d div_d
+}
+
+define sqrt_sub (double x, double guess) (double)
+{
+	x guess sqrt_diff 0.001d lt_d if
+	{
+		return guess;
+	}
+	{
+		return x x guess newton_step sqrt_sub;
+	}
+	
+}
+
+define sqrt (double x) (double)
+{
+	return x 1.0d sqrt_sub;
+}
+
+4.0d sqrt

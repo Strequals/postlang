@@ -1,0 +1,5 @@
+define +(int a, int b)(int)
+{
+	return a b add_i;
+}
+1 2 + stdio.cout_i
